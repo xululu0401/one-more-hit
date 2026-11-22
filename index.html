@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>血多了一滴</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f1efe9; color: #24211c; line-height: 1.6; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 20px 14px 40px; }
+  h1 { font-size: 26px; letter-spacing: 1px; }
+  .lead { color: #57524a; font-size: 14px; margin: 4px 0 14px; }
+  .card { background: #fff; border-radius: 8px; padding: 14px; border: 1px solid #ddd7cc; margin-bottom: 14px; min-width: 0; }
+  .card h2 { font-size: 15px; color: #3a352d; font-weight: 600; margin-bottom: 8px; overflow-wrap: anywhere; }
+  .duo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+  .unit { border-radius: 8px; padding: 12px; min-width: 0; }
+  .unit.a { background: #eef3fa; border: 1px solid #c8d6ea; } .unit.b { background: #fbf0ec; border: 1px solid #ecd0c6; }
+  .fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .fields .wide { grid-column: 1 / -1; }
+  label { font-size: 12px; color: #5e584f; display: block; overflow-wrap: anywhere; }
+  input, select { font: inherit; font-size: 14px; padding: 6px 8px; border: 1px solid #b4ab9d; border-radius: 5px; width: 100%; min-width: 0; background: #fff; font-variant-numeric: tabular-nums; }
+  .bad { border-color: #b4232c !important; background: #fff0f0 !important; }
+  .rules { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 8px; margin-top: 12px; }
+  button { font: inherit; font-size: 13px; padding: 6px 11px; border-radius: 5px; border: 1px solid #4a3f2f; background: #4a3f2f; color: #fff; cursor: pointer; }
+  button.ghost { background: #fff; color: #4a3f2f; }
+  .presets, .dl { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .err { display: none; background: #fff0f0; border: 1px solid #e3b0b3; color: #8a1c24; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; overflow-wrap: anywhere; }
+  .muted { color: #756e63; font-size: 12px; }
+  #summary { font-size: 19px; font-weight: 700; overflow-wrap: anywhere; margin-bottom: 8px; }
+  #facts { margin: 8px 0 0 18px; font-size: 14px; } #facts li { margin: 3px 0; overflow-wrap: anywhere; }
+  /* 双泳道时间轴 */
+  .lanes { position: relative; padding: 4px 0 26px; }
+  .lane { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 8px; align-items: center; margin: 6px 0; }
+  .lane .who { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lane .bar { position: relative; height: 34px; background: #f6f4ef; border-radius: 4px; }
+  .lane .hp { position: absolute; left: 0; right: 0; bottom: 0; height: 6px; border-radius: 0 0 4px 4px; background: #e4dfd5; overflow: hidden; }
+  .lane .hp i { position: absolute; left: 0; top: 0; bottom: 0; }
+  .tick { position: absolute; top: 4px; width: 2px; height: 20px; margin-left: -1px; border-radius: 1px; }
+  .a .tick, .lane.a .hp i { background: #3d6fae; } .b .tick, .lane.b .hp i { background: #c0573e; }
+  .tick.kill { width: 6px; margin-left: -3px; height: 24px; top: 2px; background: #1f1b16 !important; }
+  .endline { position: absolute; top: 0; bottom: 20px; border-left: 2px dashed #1f1b16; }
+  .axis { position: absolute; left: 84px; right: 0; bottom: 0; height: 20px; font-size: 11px; color: #756e63; }
+  .axis span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: #5e584f; margin-top: 4px; }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; background: var(--c); }
+  /* 断点阶梯 */
+  .stairs { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+  .st h3 { font-size: 13px; color: #3a352d; margin-bottom: 4px; overflow-wrap: anywhere; }
+  .strip { display: flex; height: 44px; border-radius: 4px; overflow: hidden; position: relative; }
+  .strip div { position: relative; min-width: 0; border-right: 1px solid #fff; font-size: 12px; display: flex; align-items: center; justify-content: center; color: #24211c; white-space: nowrap; overflow: hidden; }
+  .strip div.cur { outline: 2px solid #1f1b16; outline-offset: -2px; font-weight: 700; }
+  .strip .pin { position: absolute; top: 32px; bottom: 0; width: 0; border-left: 3px solid #1f1b16; z-index: 2; margin-left: -1px; }
+  .strip .pin.t { top: 0; bottom: 32px; }
+  .stlab { display: flex; justify-content: space-between; font-size: 11px; color: #756e63; font-variant-numeric: tabular-nums; }
+  .stnote { font-size: 13px; margin-top: 4px; overflow-wrap: anywhere; }
+  #sugs { display: grid; gap: 8px; }
+  .sug { display: flex; gap: 10px; align-items: center; justify-content: space-between; border: 1px solid #e6e0d5; border-radius: 6px; padding: 8px 10px; }
+  .sug span { min-width: 0; overflow-wrap: anywhere; font-size: 14px; } .sug button { flex: none; }
+  .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; max-height: 320px; overflow-y: auto; }
+  table.log { border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; width: 100%; }
+  table.log th, table.log td { border-bottom: 1px solid #ece7de; padding: 4px 8px; text-align: right; white-space: nowrap; }
+  table.log th:nth-child(2), table.log td:nth-child(2) { text-align: left; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+  table.log th { background: #f6f4ef; position: sticky; top: 0; }
+  table.log tr.kill td { font-weight: 700; background: #fff3d6; }
+  .how { font-size: 13px; color: #3a352d; } .how p { margin: 6px 0; } .how b { color: #24211c; }
+  @media (max-width: 720px) { .duo, .stairs { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 480px) {
+    .fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rules { grid-template-columns: minmax(0, 1fr); }
+    .sug { flex-direction: column; align-items: stretch; } #summary { font-size: 16px; }
+    .lane { grid-template-columns: 52px minmax(0, 1fr); } .axis { left: 60px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>血多了一滴</h1>
+  <p class="lead">两个单位对砍，谁先倒下？填两边的血量、护甲、每刀伤害和出手间隔，这里算各要砍几刀、谁先砍完、赢的还剩多少血，再告诉你「刀数断点」在哪：对面的血多 1 点、你的伤害少 1 点，会不会就要多砍一刀、输掉整场。适合做游戏数值、写平衡补丁、或者想弄明白「为什么改了 1 点数值就变天」。默认两个单位是虚构的。</p>
+
+  <div class="card">
+    <h2>两边的数值</h2>
+    <div class="duo">
+      <div class="unit a"><div class="fields">
+        <div class="wide"><label for="aName">甲的名字</label><input id="aName" maxlength="24"></div>
+        <div><label for="aHp">血量</label><input id="aHp" inputmode="numeric" maxlength="9"></div>
+        <div><label for="aArmor">护甲</label><input id="aArmor" inputmode="decimal" maxlength="8"></div>
+        <div><label for="aInt">出手间隔（秒）</label><input id="aInt" inputmode="decimal" maxlength="6"></div>
+        <div><label for="aMin">每刀最低伤害</label><input id="aMin" inputmode="numeric" maxlength="7"></div>
+        <div><label for="aMax">每刀最高伤害</label><input id="aMax" inputmode="numeric" maxlength="7"></div>
+        <div><label for="aDelay">第一刀前摇（秒）</label><input id="aDelay" inputmode="decimal" maxlength="6"></div>
+      </div></div>
+      <div class="unit b"><div class="fields">
+        <div class="wide"><label for="bName">乙的名字</label><input id="bName" maxlength="24"></div>
+        <div><label for="bHp">血量</label><input id="bHp" inputmode="numeric" maxlength="9"></div>
+        <div><label for="bArmor">护甲</label><input id="bArmor" inputmode="decimal" maxlength="8"></div>
+        <div><label for="bInt">出手间隔（秒）</label><input id="bInt" inputmode="decimal" maxlength="6"></div>
+        <div><label for="bMin">每刀最低伤害</label><input id="bMin" inputmode="numeric" maxlength="7"></div>
+        <div><label for="bMax">每刀最高伤害</label><input id="bMax" inputmode="numeric" maxlength="7"></div>
+        <div><label for="bDelay">第一刀前摇（秒）</label><input id="bDelay" inputmode="decimal" maxlength="6"></div>
+      </div></div>
+    </div>
+    <div class="rules">
+      <div><label for="mode">护甲怎么算</label><select id="mode"><option value="pct">百分比减伤：伤害 ÷ (1 + 系数 × 护甲)</option><option value="flat">固定减伤：伤害 − 护甲，每刀至少 1 点</option></select></div>
+      <div><label for="coef">护甲系数（百分比减伤用）</label><input id="coef" inputmode="decimal" maxlength="6"></div>
+    </div>
+    <div class="presets" id="presets"></div>
+  </div>
+
+  <div class="err" id="error"></div>
+
+  <div id="out">
+    <div class="card">
+      <div id="summary"></div>
+      <ul id="facts"></ul>
+    </div>
+    <div class="card">
+      <h2>对砍时间轴：每一刀落在第几秒</h2>
+      <div class="lanes" id="lanes"></div>
+      <div class="legend"><span id="lgA" style="--c:#3d6fae">甲出手</span><span id="lgB" style="--c:#c0573e">乙出手</span><span style="--c:#1f1b16">砍死的那一刀</span><span style="--c:#e4dfd5">下面细条 = 剩血</span></div>
+      <p class="muted" id="tlNote"></p>
+    </div>
+    <div class="card">
+      <h2>刀数断点：对面血量落在哪一格，就要砍几刀</h2>
+      <div class="stairs" id="stairs"></div>
+      <p class="muted" style="margin-top:6px">每一格是「刀数相同」的一段血量。黑线是现在的血量；离右边界越近，越是「再多一滴就多一刀」。按平均伤害算。</p>
+    </div>
+    <div class="card" id="sugCard">
+      <h2 id="sugTitle">单改一项就翻盘（点一下代回重算）</h2>
+      <div id="sugs"></div>
+    </div>
+    <div class="card">
+      <h2>逐刀记录</h2>
+      <div class="scroll"><table class="log" id="log"></table></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>带走结果</h2>
+    <div class="dl">
+      <button id="dlCSV">CSV 表格</button><button id="dlMD">Markdown 报告</button><button id="dlPNG">结果卡 PNG</button><button id="dlJSON" class="ghost">JSON 备份</button>
+      <button id="reset" class="ghost">恢复默认</button>
+    </div>
+    <p class="muted" style="margin-top:6px">输入自动保存在这台设备的浏览器里，刷新还在。</p>
+  </div>
+
+  <div class="card how">
+    <h2>怎么算的</h2>
+    <p><b>每刀实际伤害</b>：百分比减伤 = 伤害 ÷ (1 + 系数 × 护甲)，护甲为负时 = 伤害 × (2 − (1 − 系数)^(−护甲))；固定减伤 = 伤害 − 护甲，每刀至少 1 点。系数 0.06 是游戏圈常见的写法，只是示意，具体游戏以官方数据为准。</p>
+    <p><b>要砍几刀</b>：伤害在最低到最高之间每个整数等可能，取平均每刀 e，刀数 = 向上取整(对方血量 ÷ e)。K 刀最多砍得掉 K × e 血，对方血量一超过它就要多砍一刀，这就是断点。</p>
+    <p><b>谁先倒下</b>：第 i 刀落在 前摇 + (i − 1) × 出手间隔 秒，谁的最后一刀先落地谁赢；同一时刻算同归于尽。赢家剩血 = 血量 − 在那之前挨的刀数 × 对方平均每刀。</p>
+    <p><b>看运气</b>：每刀都摇到最低 = 最多几刀，每刀都摇到最高 = 最少几刀，用来判断结果是不是「怎么摇都一样」。</p>
+    <p class="muted">没考虑：回血、暴击、闪避、走位、技能、多打一、弹道飞行时间、攻击打断。平均伤害下的刀数不是概率分布，想要胜率得另做模拟。</p>
+  </div>
+</div>
+
+  <script>
+/* 血多了一滴 · 计算核心
+ * 两个单位对砍（甲打乙、乙打甲），各自：血量 HP、护甲 a、每刀伤害（最低–最高，整数均匀）、出手间隔、第一刀前摇。
+ * 每刀实际伤害 eff(r)：
+ *   百分比减伤（pct）：a ≥ 0 时 r ÷ (1 + c·a)；a < 0 时 r × (2 − (1 − c)^(−a))。c 默认 0.06（游戏圈常见写法，示意用）。
+ *   固定减伤（flat）：max(1, r − a)，每刀至少 1 点。
+ * 平均每刀 e = 最低到最高每个整数的 eff 取平均；砍死要 K = ⌈HP ÷ e⌉ 刀（按平均伤害）。
+ * 第 i 刀落在 前摇 + (i − 1) × 间隔 秒；谁先砍完谁赢，同一时刻砍完算同归于尽。
+ * 运气：每刀都最低 → 最多几刀；每刀都最高 → 最少几刀。不算回血、暴击、闪避、走位、技能、多打一。 */
+(function (root) {
+  'use strict';
+  const EPS = 1e-9;
+  function Bad(message, field) { const e = new Error(message); e.field = field; return e; }
+
+  /* [名称, 下限, 上限, 整数, 单位] */
+  const NUM = {
+    aHp: ['甲的血量', 1, 1e6, true, '点'], aArmor: ['甲的护甲', -20, 1e5, false, ''], aMin: ['甲的最低伤害', 0, 1e5, true, '点'], aMax: ['甲的最高伤害', 1, 1e5, true, '点'],
+    aInt: ['甲的出手间隔', 0.05, 30, false, '秒'], aDelay: ['甲的第一刀前摇', 0, 30, false, '秒'],
+    bHp: ['乙的血量', 1, 1e6, true, '点'], bArmor: ['乙的护甲', -20, 1e5, false, ''], bMin: ['乙的最低伤害', 0, 1e5, true, '点'], bMax: ['乙的最高伤害', 1, 1e5, true, '点'],
+    bInt: ['乙的出手间隔', 0.05, 30, false, '秒'], bDelay: ['乙的第一刀前摇', 0, 30, false, '秒'],
+    coef: ['护甲系数', 0.001, 1, false, ''],
+  };
+  const KEYS = ['aName', 'aHp', 'aArmor', 'aMin', 'aMax', 'aInt', 'aDelay', 'bName', 'bHp', 'bArmor', 'bMin', 'bMax', 'bInt', 'bDelay', 'mode', 'coef'];
+  const MAXHITS = 100000;
+
+  function num(v, k) {
+    const [label, lo, hi, int, unit] = NUM[k];
+    const s = String(v == null ? '' : v).replace(/[,，\s]/g, '');
+    if (s === '') throw Bad(label + '没填', k);
+    if (!/^-?\d+(\.\d+)?$/.test(s)) throw Bad(label + '要填数字（现在是「' + String(v).slice(0, 12) + '」）', k);
+    const x = +s;
+    if (int && !Number.isInteger(x)) throw Bad(label + '要填整数', k);
+    if (x < lo || x > hi) throw Bad(label + '要在 ' + fmtN(lo) + ' 到 ' + fmtN(hi) + (unit ? ' ' + unit : '') + '之间', k);
+    return x;
+  }
+  function fmtN(x) { return Math.abs(x) >= 10000 ? x.toLocaleString('en-US') : String(x); }
+  function cleanName(v, fb) { const s = String(v == null ? '' : v).replace(/[\u0000-\u001f]/g, '').trim().slice(0, 24); return s || fb; }
+
+  function parse(inp) {
+    const P = {};
+    for (const k of Object.keys(NUM)) P[k] = num(inp[k], k);
+    P.mode = inp.mode === 'flat' ? 'flat' : inp.mode === 'pct' ? 'pct' : null;
+    if (!P.mode) throw Bad('护甲算法要选「百分比减伤」或「固定减伤」', 'mode');
+    P.aName = cleanName(inp.aName, '甲'); P.bName = cleanName(inp.bName, '乙');
+    if (P.aName === P.bName) P.bName = P.bName + '（乙）';
+    for (const s of ['a', 'b']) {
+      const W = s === 'a' ? '甲' : '乙';
+      if (P[s + 'Min'] > P[s + 'Max']) throw Bad(W + '的最低伤害不能高于最高伤害（' + P[s + 'Max'] + '）', s + 'Min');
+      if (P[s + 'Max'] - P[s + 'Min'] > 10000) throw Bad(W + '的伤害浮动太大（最高减最低超过 10,000）', s + 'Max');
+      if (P.mode === 'flat' && !Number.isInteger(P[s + 'Armor'])) throw Bad('固定减伤时' + W + '的护甲要填整数', s + 'Armor');
+      if (P.mode === 'pct' && P[s + 'Armor'] > 1000) throw Bad('百分比减伤时' + W + '的护甲要在 −20 到 1000 之间', s + 'Armor');
+    }
+    return P;
+  }
+
+  /* 护甲把一刀伤害乘多少（百分比减伤） */
+  function mult(a, c) { return a >= 0 ? 1 / (1 + c * a) : 2 - Math.pow(1 - c, -a); }
+  function effOne(r, a, mode, c) { return mode === 'flat' ? Math.max(1, r - a) : r * mult(a, c); }
+  /* 平均每刀（最低到最高每个整数等可能） */
+  function effMean(lo, hi, a, mode, c) {
+    if (mode !== 'flat') return (lo + hi) / 2 * mult(a, c);
+    /* max(1, r − a)：r ≤ a + 1 的都是 1，其余 r − a */
+    const n = hi - lo + 1, cut = Math.min(hi, Math.max(lo - 1, Math.floor(a + 1)));
+    const ones = cut - lo + 1, r0 = cut + 1;
+    const rest = hi >= r0 ? (r0 + hi) * (hi - r0 + 1) / 2 - a * (hi - r0 + 1) : 0;
+    return (ones + rest) / n;
+  }
+  function hits(hp, e) { if (!(e > 0)) return Infinity; const k = Math.ceil(hp / e - EPS); return Math.max(1, k); }
+  /* K 刀最多砍得掉多少血：hits(hp) ≤ K 的最大整数 hp（用 hits 本身校正，避免两处浮点容差不一致） */
+  function topHp(K, e) { let t = Math.floor(K * e); while (t > 0 && hits(t, e) > K) t--; while (hits(t + 1, e) <= K) t++; return t; }
+  function tOf(k, delay, iv) { return k === Infinity ? Infinity : Math.round((delay + (k - 1) * iv) * 1e6) / 1e6; }
+  const r6 = (x) => Math.round(x * 1e6) / 1e6;
+
+  /* 一个方向：s 打 o */
+  function side(P, s) {
+    const o = s === 'a' ? 'b' : 'a';
+    const lo = P[s + 'Min'], hi = P[s + 'Max'], a = P[o + 'Armor'], hp = P[o + 'Hp'];
+    const e = effMean(lo, hi, a, P.mode, P.coef), eLo = effOne(lo, a, P.mode, P.coef), eHi = effOne(hi, a, P.mode, P.coef);
+    const K = hits(hp, e), Kworst = hits(hp, eLo), Kbest = hits(hp, eHi);
+    return { s, o, e, eLo, eHi, K, Kworst, Kbest, t: tOf(K, P[s + 'Delay'], P[s + 'Int']), tWorst: tOf(Kworst, P[s + 'Delay'], P[s + 'Int']), tBest: tOf(Kbest, P[s + 'Delay'], P[s + 'Int']) };
+  }
+  function verdict(tA, tB) { const x = r6(tA), y = r6(tB); return x < y ? 'a' : y < x ? 'b' : 'tie'; }
+  /* 同一时刻的两刀都算落地（所以同时砍死才是同归于尽），赢家挨的刀包括和自己最后一刀同时落下的那一刀 */
+  function landedBefore(t, delay, iv, kmax) { if (r6(t) < r6(delay)) return 0; let n = Math.floor((t - delay) / iv) + 1; while (n > 0 && r6(delay + (n - 1) * iv) > r6(t)) n--; while (r6(delay + n * iv) <= r6(t)) n++; return Math.min(n, kmax); }
+
+  function duel(P) {
+    const A = side(P, 'a'), B = side(P, 'b');
+    const w = verdict(A.t, B.t);
+    let left = null;
+    if (w !== 'tie') {
+      const W = w === 'a' ? A : B, L = w === 'a' ? B : A;
+      const n = landedBefore(W.t, P[L.s + 'Delay'], P[L.s + 'Int'], L.K - 1);
+      left = { hitsTaken: n, hp: P[W.s + 'Hp'] - n * L.e };
+    }
+    /* 运气：甲最好乙最差 / 甲最差乙最好 */
+    const luckA = verdict(A.tBest, B.tWorst), luckB = verdict(A.tWorst, B.tBest);
+    const luck = luckA === 'a' && luckB === 'a' ? 'a-sure' : luckA === 'b' && luckB === 'b' ? 'b-sure' : 'luck';
+    return { A, B, w, left, luck, luckA, luckB };
+  }
+
+  /* 单调搜索：最小整数步 n（1..cap）使 ok(n) 为真；没有返回 null */
+  function minStep(ok, cap) {
+    if (!ok(cap)) return null;
+    let lo = 0, hi = cap;
+    while (hi - lo > 1) { const m = Math.floor((lo + hi) / 2); if (ok(m)) hi = m; else lo = m; }
+    return hi;
+  }
+  function withP(P, patch) { return Object.assign({}, P, patch); }
+
+  /* 断点：s 打 o 的刀数在哪儿跳 */
+  function breakpoints(P, s) {
+    const o = s === 'a' ? 'b' : 'a', S = side(P, s), K = S.K, e = S.e, hp = P[o + 'Hp'];
+    const out = { K, e };
+    /* 对方血量：K 刀最多砍得死 floor(K·e) 点 */
+    const top = topHp(K, e), prev = K > 1 ? topHp(K - 1, e) : 0;
+    out.hpMore = top + 1 - hp;                          /* 再多这么多点就要 K+1 刀 */
+    out.hpLess = K > 1 ? hp - prev : null;              /* 少这么多点就只要 K−1 刀 */
+    out.hpTop = top; out.hpLow = prev + 1;
+    /* 自己攻击（最低/最高一起加减） */
+    const kDmg = (d) => side(withP(P, { [s + 'Min']: P[s + 'Min'] + d, [s + 'Max']: P[s + 'Max'] + d }), s).K;
+    out.dmgUp = K > 1 ? minStep((d) => kDmg(d) < K, 1e6) : null;
+    out.dmgDown = minStep((d) => P[s + 'Min'] - d < 0 || kDmg(-d) > K, P[s + 'Min'] + 1);
+    if (out.dmgDown != null && P[s + 'Min'] - out.dmgDown < 0) out.dmgDown = null;
+    /* 对方护甲（整数步） */
+    const kArm = (d) => side(withP(P, { [o + 'Armor']: P[o + 'Armor'] + d }), s).K;
+    const armCap = P.mode === 'pct' ? 1000 - P[o + 'Armor'] : 1e5 - P[o + 'Armor'];
+    out.armUp = armCap >= 1 ? minStep((d) => kArm(d) > K, Math.floor(armCap)) : null;
+    const armDownCap = Math.floor(P[o + 'Armor'] + 20);
+    out.armDown = K > 1 && armDownCap >= 1 ? minStep((d) => kArm(-d) < K, armDownCap) : null;
+    return out;
+  }
+
+  /* 让 s 赢（严格先砍死对方）的单项最小改动 */
+  function flips(P, s) {
+    const out = [];
+    const wins = (Q) => duel(Q).w === s;
+    const W = s === 'a' ? '甲' : '乙', nm = P[s + 'Name'];
+    const dm = minStep((d) => wins(withP(P, { [s + 'Min']: P[s + 'Min'] + d, [s + 'Max']: P[s + 'Max'] + d })), 1e5 - P[s + 'Max']);
+    if (dm != null) out.push({ id: s + '-dmg', field: s + 'Max', delta: dm, text: nm + '每刀伤害 +' + dm.toLocaleString('en-US') + '（最低 ' + (P[s + 'Min'] + dm) + '、最高 ' + (P[s + 'Max'] + dm) + '）', patch: { [s + 'Min']: P[s + 'Min'] + dm, [s + 'Max']: P[s + 'Max'] + dm } });
+    const hp = minStep((d) => wins(withP(P, { [s + 'Hp']: P[s + 'Hp'] + d })), 1e6 - P[s + 'Hp']);
+    if (hp != null) out.push({ id: s + '-hp', field: s + 'Hp', delta: hp, text: nm + '血量 +' + hp.toLocaleString('en-US') + '（到 ' + (P[s + 'Hp'] + hp).toLocaleString('en-US') + '）', patch: { [s + 'Hp']: P[s + 'Hp'] + hp } });
+    const capA = Math.floor((P.mode === 'pct' ? 1000 : 1e5) - P[s + 'Armor']);
+    const ar = capA >= 1 ? minStep((d) => wins(withP(P, { [s + 'Armor']: P[s + 'Armor'] + d })), capA) : null;
+    if (ar != null) out.push({ id: s + '-arm', field: s + 'Armor', delta: ar, text: nm + '护甲 +' + ar.toLocaleString('en-US') + '（到 ' + r6(P[s + 'Armor'] + ar) + '）', patch: { [s + 'Armor']: r6(P[s + 'Armor'] + ar) } });
+    /* 出手间隔每次快 0.01 秒 */
+    const capI = Math.round((P[s + 'Int'] - 0.05) * 100);
+    const iv = capI >= 1 ? minStep((d) => wins(withP(P, { [s + 'Int']: r6(P[s + 'Int'] - d / 100) })), capI) : null;
+    if (iv != null) out.push({ id: s + '-int', field: s + 'Int', delta: iv / 100, text: nm + '出手间隔快 ' + (iv / 100).toFixed(2) + ' 秒（到 ' + r6(P[s + 'Int'] - iv / 100) + ' 秒）', patch: { [s + 'Int']: r6(P[s + 'Int'] - iv / 100) } });
+    out.forEach((x) => { x.side = s; x.who = W; });
+    return out;
+  }
+
+  /* 时间线：两边每一刀的时刻与对方剩血，到第一个人倒下为止 */
+  function timeline(P, d) {
+    const end = Math.min(d.A.t, d.B.t), ev = [];
+    for (const S of [d.A, d.B]) {
+      const iv = P[S.s + 'Int'], dl = P[S.s + 'Delay'], hp = P[S.o + 'Hp'];
+      const push = (i) => ev.push({ s: S.s, i, t: r6(dl + (i - 1) * iv), left: Math.max(0, hp - i * S.e), kill: i === S.K });
+      let i = 1;
+      for (; i <= S.K && i <= 400; i++) { if (r6(dl + (i - 1) * iv) > r6(end)) break; push(i); }
+      /* 截断时仍补上砍死的那一刀（只有它在结束时刻之前或同时才补） */
+      if (S.K > 400 && r6(dl + (S.K - 1) * iv) <= r6(end)) push(S.K);
+    }
+    ev.sort((x, y) => x.t - y.t || (x.s < y.s ? -1 : 1));
+    return { end: r6(end), ev, truncated: d.A.K > 400 || d.B.K > 400 };
+  }
+
+  function calculate(inp) {
+    const P = parse(inp);
+    const d = duel(P);
+    if (d.A.K > MAXHITS || d.B.K > MAXHITS) throw Bad('要砍超过 ' + MAXHITS.toLocaleString('en-US') + ' 刀，数字差太远了，换小一点', d.A.K > MAXHITS ? 'bHp' : 'aHp');
+    const bpA = breakpoints(P, 'a'), bpB = breakpoints(P, 'b');
+    const loser = d.w === 'a' ? 'b' : d.w === 'b' ? 'a' : 'a';
+    const fl = flips(P, loser);
+    /* 赢家有多险：对面最小的翻盘改动（不论哪项）也算一遍 */
+    const r = { P, d, bpA, bpB, loser, flips: fl, tl: timeline(P, d) };
+    r.summary = summary(r); r.facts = facts(r);
+    return r;
+  }
+
+  const nm = (P, s) => P[s + 'Name'];
+  function f1(x) { const v = Math.round(x * 10) / 10; return (v < 0 ? '−' : '') + Math.abs(v).toLocaleString('en-US', { maximumFractionDigits: 1 }); }
+  function sec(x) { return x === Infinity ? '永远' : (Math.round(x * 100) / 100).toFixed(2).replace(/\.?0+$/, '') + ' 秒'; }
+  /* 剩血 0 到 1 之间如实写「不到 1」，不四舍五入成 1 */
+  function hpLeft(x) { return x > 0 && x < 1 ? '不到 1' : ' ' + f1(x); }
+  function kl(k) { return k === Infinity ? '砍不死' : k.toLocaleString('en-US') + ' 刀'; }
+
+  function summary(r) {
+    const P = r.P, d = r.d, A = d.A, B = d.B;
+    if (d.w === 'tie') return nm(P, 'a') + '和' + nm(P, 'b') + '同归于尽：都在第 ' + sec(A.t) + '砍出最后一刀（' + nm(P, 'a') + '要 ' + kl(A.K) + '，' + nm(P, 'b') + '要 ' + kl(B.K) + '）。';
+    const W = d.w === 'a' ? A : B, L = d.w === 'a' ? B : A;
+    return nm(P, W.s) + '赢：' + sec(W.t) + '砍完 ' + kl(W.K) + '，' + nm(P, L.s) + '要 ' + kl(L.K) + '、得到 ' + sec(L.t) + '；' + nm(P, W.s) + '还剩' + hpLeft(r.d.left.hp) + ' 血（挨了 ' + r.d.left.hitsTaken + ' 刀）。';
+  }
+  function bpText(P, s, bp) {
+    const o = s === 'a' ? 'b' : 'a', t = [];
+    const g = (x) => x.toLocaleString('en-US');
+    t.push(nm(P, s) + '打' + nm(P, o) + '每刀平均 ' + f1(bp.e) + '，' + g(bp.K) + ' 刀最多砍得掉 ' + g(bp.hpTop) + ' 血：' + nm(P, o) + '的血再多 ' + g(bp.hpMore) + ' 点就要第 ' + g(bp.K + 1) + ' 刀' + (bp.hpLess != null ? '，少 ' + g(bp.hpLess) + ' 点只要 ' + g(bp.K - 1) + ' 刀' : '') + '。');
+    const u = [];
+    if (bp.dmgUp != null) u.push(nm(P, s) + '每刀 +' + g(bp.dmgUp) + ' 少一刀');
+    if (bp.dmgDown != null) u.push('−' + g(bp.dmgDown) + ' 多一刀');
+    if (bp.armUp != null) u.push(nm(P, o) + '护甲 +' + g(bp.armUp) + ' 多一刀');
+    if (bp.armDown != null) u.push('护甲 −' + g(bp.armDown) + ' 少一刀');
+    if (u.length) t.push(u.join('，') + '。');
+    return t.join('');
+  }
+  function facts(r) {
+    const P = r.P, d = r.d, f = [];
+    f.push(bpText(P, 'a', r.bpA)); f.push(bpText(P, 'b', r.bpB));
+    const la = d.A.Kworst === d.A.Kbest && d.B.Kworst === d.B.Kbest;
+    if (la) f.push('两边伤害都没浮动，结果是定的。');
+    else {
+      const t = '看运气：' + nm(P, 'a') + '最少 ' + kl(d.A.Kbest) + '、最多 ' + kl(d.A.Kworst) + '；' + nm(P, 'b') + '最少 ' + kl(d.B.Kbest) + '、最多 ' + kl(d.B.Kworst) + '。';
+      const v = d.luck === 'a-sure' ? '怎么摇都是' + nm(P, 'a') + '赢。' : d.luck === 'b-sure' ? '怎么摇都是' + nm(P, 'b') + '赢。' : nm(P, 'a') + '手气最好时' + vt(P, d.luckA) + '，最差时' + vt(P, d.luckB) + '，上面的结论按平均伤害。';
+      f.push(t + v);
+    }
+    if (r.flips.length) {
+      f.push((d.w === 'tie' ? '打破平手' : nm(P, r.loser) + '想翻盘') + '，单改一项最少：' + r.flips.map((x) => x.text).join('；') + '。');
+    } else f.push(nm(P, r.loser) + '单改伤害、血量、护甲、出手间隔里的任何一项，在允许范围内都翻不了盘。');
+    return f;
+  }
+  function vt(P, w) { return w === 'tie' ? '打平' : nm(P, w) + '赢'; }
+
+  /* 建议：把翻盘改动做成可代回的输入 */
+  function suggestions(inp, r) {
+    return r.flips.map((x) => {
+      const apply = Object.assign({}, inp);
+      Object.keys(x.patch).forEach((k) => { apply[k] = String(x.patch[k]); });
+      return { id: x.id, text: (r.d.w === 'tie' ? '打破平手：' : '让' + r.P[x.side + 'Name'] + '赢：') + x.text, apply };
+    });
+  }
+
+  /* 断点阶梯：对方血量从 lo 到 hi，各要几刀（按平均伤害） */
+  function stairs(P, s, span) {
+    const o = s === 'a' ? 'b' : 'a', S = side(P, s), hp = P[o + 'Hp'], e = S.e;
+    const w = Math.max(3, Math.ceil(e * (span || 3)));
+    const lo = Math.max(1, hp - w), hi = hp + w, pts = [];
+    let k = hits(lo, e); pts.push([lo, k]);
+    /* 刀数在 topHp(k)+1 处跳一级 */
+    for (let guard = 0; guard < 200; guard++) { const nx = topHp(k, e) + 1; if (nx > hi) break; k = hits(nx, e); pts.push([nx, k]); }
+    return { lo, hi, hp, K: S.K, pts };
+  }
+
+  function csvCell(v) { const s = String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+  const LAB = { aName: '甲的名字', bName: '乙的名字', mode: '护甲算法' };
+  function label(k) { return LAB[k] || NUM[k][0] + (NUM[k][4] ? '（' + NUM[k][4] + '）' : ''); }
+  function val(P, k) { return k === 'mode' ? (P.mode === 'flat' ? '固定减伤' : '百分比减伤') : P[k]; }
+  function toCSV(r, stamp) {
+    const P = r.P, L = [['血多了一滴', '生成于 ' + stamp], ['结论', r.summary], []];
+    L.push(['输入', '值']); KEYS.forEach((k) => L.push([label(k), val(P, k)]));
+    L.push([], ['谁打谁', '平均每刀', '要几刀（平均）', '最少几刀', '最多几刀', '砍完时刻（秒）']);
+    [r.d.A, r.d.B].forEach((S) => L.push([nm(P, S.s) + '打' + nm(P, S.o), r6(S.e), S.K, S.Kbest, S.Kworst === Infinity ? '砍不死' : S.Kworst, S.t === Infinity ? '' : r6(S.t)]));
+    L.push([], ['时刻（秒）', '谁出手', '第几刀', '对方剩血']);
+    r.tl.ev.forEach((x) => L.push([x.t, nm(P, x.s), x.i, r6(x.left)]));
+    L.push([], ['断点', '说明']); r.facts.forEach((x, i) => L.push([i + 1, x]));
+    return L.map((row) => row.map(csvCell).join(',')).join('\n') + '\n';
+  }
+  function toMD(r, stamp, sg) {
+    const P = r.P, o = [];
+    o.push('# 血多了一滴', '', '生成时间：' + stamp + '　默认两个单位和数值都是虚构的，不是任何游戏的真实数据', '', '**' + r.summary + '**', '');
+    r.facts.forEach((x) => o.push('- ' + x));
+    o.push('', '## 两边', '', '| | ' + mdc(nm(P, 'a')) + ' | ' + mdc(nm(P, 'b')) + ' |', '|---|---|---|');
+    ['Hp', 'Armor', 'Min', 'Max', 'Int', 'Delay'].forEach((k) => o.push('| ' + NUM['a' + k][0].slice(2) + ' | ' + P['a' + k] + ' | ' + P['b' + k] + ' |'));
+    o.push('', '护甲算法：' + val(P, 'mode') + (P.mode === 'pct' ? '（系数 ' + P.coef + '）' : '（每刀至少 1 点）'));
+    o.push('', '## 时间线', '', '| 时刻 | 谁出手 | 第几刀 | 对方剩血 |', '|---|---|---|---|');
+    r.tl.ev.forEach((x) => o.push('| ' + sec(x.t) + ' | ' + mdc(nm(P, x.s)) + ' | ' + x.i + ' | ' + f1(x.left) + (x.kill ? '（倒下）' : '') + ' |'));
+    if (sg && sg.length) { o.push('', '## 单改一项就翻盘'); sg.forEach((s) => o.push('- ' + s.text)); }
+    o.push('', '## 前提', '', '- 按平均伤害算刀数；伤害在最低到最高之间每个整数等可能。', '- 不算回血、暴击、闪避、走位、技能、多打一、攻击弹道飞行时间。', '- 百分比减伤公式是游戏圈常见写法的示意，具体游戏以官方数据为准。');
+    return o.join('\n') + '\n';
+  }
+  function mdc(s) { return String(s).replace(/\|/g, '\\|'); }
+
+  const DEFAULT = { aName: '盾兵', aHp: '420', aArmor: '2', aMin: '19', aMax: '23', aInt: '1.35', aDelay: '0.3', bName: '斧手', bHp: '416', bArmor: '1', bMin: '21', bMax: '25', bInt: '1.4', bDelay: '0.4', mode: 'pct', coef: '0.06' };
+  const PRESETS = [
+    ['默认：盾兵对斧手', DEFAULT],
+    ['斧手多 1 滴血', Object.assign({}, DEFAULT, { bHp: '417' })],
+    ['换成固定减伤', Object.assign({}, DEFAULT, { mode: 'flat' })],
+    ['伤害浮动很大', Object.assign({}, DEFAULT, { aMin: '10', aMax: '32', bMin: '12', bMax: '34' })],
+  ];
+
+  const api = { DEFAULT, PRESETS, NUM, KEYS, parse, calculate, suggestions, mult, effOne, effMean, hits, side, duel, breakpoints, flips, timeline, stairs, topHp, minStep, verdict, f1, sec, kl, toCSV, toMD, label, val, MAXHITS };
+  if (typeof module === 'object' && module.exports) module.exports = api; else root.AppCore = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+  </script>
+  <script>
+/* 血多了一滴 · 界面层 */
+(function () {
+  'use strict';
+  const C = window.AppCore;
+  const KEY = 'one-more-hit:v1';
+  const copy = (o) => JSON.parse(JSON.stringify(o));
+  const DEFAULT = C.DEFAULT, PRESETS = C.PRESETS, KEYS = C.KEYS;
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  let state = copy(DEFAULT);
+  let last = null;
+
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* 隐私模式忽略 */ } }
+  function load() {
+    try {
+      const o = JSON.parse(localStorage.getItem(KEY) || 'null');
+      if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+      const s = {};
+      for (const k of KEYS) { if (o[k] == null || typeof o[k] === 'object') return null; s[k] = String(o[k]).slice(0, 24); }
+      return s;
+    } catch (e) { return null; }
+  }
+  function fill() { KEYS.forEach((k) => { $(k).value = state[k]; }); }
+
+  function renderLanes(r) {
+    const P = r.P, tl = r.tl, T = Math.max(tl.end, 0.5) * 1.06;
+    const pos = (t) => (t / T * 100).toFixed(3) + '%';
+    let h = '';
+    for (const s of ['a', 'b']) {
+      const ev = tl.ev.filter((x) => x.s === s);
+      /* 剩血细条画的是「被打的那一方」：这条泳道下方画自己的剩血 */
+      /* 剩血按结论算（不按列出来的刀数，刀数多时时间轴只画了一部分） */
+      const myLeft = r.d.w === s ? r.d.left.hp : 0, frac = myLeft / P[s + 'Hp'];
+      h += '<div class="lane ' + s + '"><div class="who" title="' + esc(P[s + 'Name']) + '">' + esc(P[s + 'Name']) + '</div><div class="bar">';
+      const step = ev.length > 160 ? Math.ceil(ev.length / 160) : 1;
+      ev.forEach((x, i) => { if (x.kill || i % step === 0) h += '<span class="tick' + (x.kill ? ' kill' : '') + '" style="left:' + pos(x.t) + '" title="' + C.sec(x.t) + ' 第 ' + x.i + ' 刀"></span>'; });
+      h += '<div class="endline" style="left:' + pos(tl.end) + '"></div>';
+      h += '<div class="hp"><i style="width:' + (frac * 100).toFixed(2) + '%"></i></div></div></div>';
+    }
+    /* 刻度 */
+    const nice = [0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000];
+    const stp = nice.find((v) => T / v <= 6) || T / 5;
+    h += '<div class="axis">';
+    for (let t = 0; t <= T + 1e-9; t += stp) h += '<span style="left:' + pos(t) + '">' + C.sec(t) + '</span>';
+    h += '</div>';
+    $('lanes').innerHTML = h;
+    $('tlNote').textContent = tl.truncated ? '刀数太多，每边只画前 400 刀和砍死的那一刀，中间留空。' : '';
+    $('lgA').textContent = P.aName + '出手'; $('lgB').textContent = P.bName + '出手';
+  }
+  const SHADE = ['#d9e6d2', '#efe3bf', '#f2cdbb', '#e7b3b3'];
+  function renderStairs(r) {
+    const P = r.P; let h = '';
+    for (const s of ['a', 'b']) {
+      const o = s === 'a' ? 'b' : 'a', st = C.stairs(P, s), bp = s === 'a' ? r.bpA : r.bpB, span = st.hi - st.lo + 1;
+      h += '<div class="st"><h3>' + esc(P[s + 'Name']) + '砍' + esc(P[o + 'Name']) + '：' + esc(P[o + 'Name']) + '的血量</h3><div class="strip">';
+      st.pts.forEach((p, i) => {
+        const a = p[0], b = i + 1 < st.pts.length ? st.pts[i + 1][0] - 1 : st.hi, w = (b - a + 1) / span * 100;
+        const cur = st.hp >= a && st.hp <= b, sh = SHADE[Math.min(3, Math.max(0, p[1] - st.K + 1))];
+        h += '<div' + (cur ? ' class="cur"' : '') + ' style="flex:0 0 ' + w.toFixed(3) + '%;background:' + sh + '" title="' + a + '–' + b + ' 血：' + p[1] + ' 刀">' + (w > 9 ? p[1] + ' 刀' : w > 4 ? p[1] : '') + '</div>';
+      });
+      const pl = ((st.hp - st.lo + 0.5) / span * 100).toFixed(3);
+      h += '<span class="pin t" style="left:' + pl + '%"></span><span class="pin" style="left:' + pl + '%"></span></div>';
+      h += '<div class="stlab"><span>' + st.lo + '</span><span>现在 ' + st.hp + '</span><span>' + st.hi + '</span></div>';
+      h += '<p class="stnote">现在 ' + bp.K + ' 刀；这一格是 ' + bp.hpLow + '–' + bp.hpTop + ' 血，' + (bp.hpMore === 1 ? '<b>再多 1 滴就要第 ' + (bp.K + 1) + ' 刀</b>' : '再多 ' + bp.hpMore + ' 血要第 ' + (bp.K + 1) + ' 刀') + '。</p></div>';
+    }
+    $('stairs').innerHTML = h;
+  }
+  function renderLog(r) {
+    const P = r.P;
+    let h = '<tr><th>时刻</th><th>谁出手</th><th>第几刀</th><th>对方剩血</th></tr>';
+    r.tl.ev.forEach((x) => { h += '<tr' + (x.kill ? ' class="kill"' : '') + '><td>' + C.sec(x.t) + '</td><td>' + esc(P[x.s + 'Name']) + '</td><td>' + x.i + '</td><td>' + C.f1(x.left) + (x.kill ? '（倒下）' : '') + '</td></tr>'; });
+    if (r.tl.truncated) h += '<tr><td colspan="4" style="text-align:left">刀数太多，每边只列前 400 刀和砍死的那一刀。</td></tr>';
+    $('log').innerHTML = h;
+  }
+  function sugList(sg, r) {
+    const box = $('sugs'); box.innerHTML = '';
+    sg.forEach((x) => {
+      const d = document.createElement('div'); d.className = 'sug';
+      d.innerHTML = '<span>' + esc(x.text) + '</span>';
+      const bt = document.createElement('button'); bt.textContent = '照这样算'; bt.dataset.sug = x.id;
+      bt.addEventListener('click', () => { state = copy(x.apply); fill(); run(); });
+      d.appendChild(bt); box.appendChild(d);
+    });
+    $('sugTitle').textContent = (r.d.w === 'tie' ? '单改一项就打破平手' : '单改一项让' + r.P[r.loser + 'Name'] + '翻盘') + '（点一下代回重算）';
+    $('sugCard').style.display = sg.length ? '' : 'none';
+  }
+  function run() {
+    [].forEach.call(document.querySelectorAll('.bad'), (e) => e.classList.remove('bad'));
+    try {
+      const r = C.calculate(state);
+      const sg = C.suggestions(state, r);
+      $('error').style.display = 'none'; $('out').style.display = '';
+      $('summary').textContent = r.summary;
+      $('summary').style.color = r.d.w === 'a' ? '#2f5f9a' : r.d.w === 'b' ? '#a8452f' : '#24211c';
+      $('facts').innerHTML = r.facts.map((f) => '<li>' + esc(f) + '</li>').join('');
+      last = { r, sg };
+      renderLanes(r); renderStairs(r); renderLog(r); sugList(sg, r);
+    } catch (e) {
+      last = null;
+      if (e.field) { const el = $(e.field); if (el) el.classList.add('bad'); }
+      $('error').textContent = '算不了：' + e.message; $('error').style.display = 'block';
+      $('out').style.display = 'none';
+    }
+    save();
+  }
+
+  /* ── 导出 ── */
+  function stamp() { const d = new Date(), z = (n) => String(n).padStart(2, '0'); return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()); }
+  function download(name, blob) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); }
+  function wrap(g, t, w) {
+    const NOHEAD = '，。、；：！？）」』%·～';
+    const out = []; let line = [];
+    const toks = String(t).match(/[+±<>−-]?[0-9][0-9,.:%/-]*(\s?(秒|刀|血|点))?|[A-Za-z_][A-Za-z0-9_.\-/]*|[\s\S]/g) || [];
+    const width = (a) => g.measureText(a.join('')).width;
+    for (const tk of toks) {
+      if (line.length && width(line.concat([tk])) > w) {
+        let carry = [tk];
+        while (line.length > 1 && (NOHEAD.indexOf(carry[0][0]) >= 0 || '（「『'.indexOf(line[line.length - 1]) >= 0)) carry.unshift(line.pop());
+        out.push(line.join(''));
+        line = carry; if (/^\s+$/.test(line[0])) line.shift();
+      } else if (!line.length && width([tk]) > w) {
+        /* 单个超长 token（比如没有空格的长名字）硬切 */
+        let s = tk; while (s.length) { let n = s.length; while (n > 1 && g.measureText(s.slice(0, n)).width > w) n--; out.push(s.slice(0, n)); s = s.slice(n); }
+      } else line.push(tk);
+    }
+    if (line.length) out.push(line.join('')); return out;
+  }
+  function fitText(g, t, w) { let s = String(t); if (g.measureText(s).width <= w) return s; while (s.length > 1 && g.measureText(s + '…').width > w) s = s.slice(0, -1); return s + '…'; }
+  function drawPNG(Lx) {
+    const r = Lx.r, P = r.P;
+    const Wd = 1080, H = 1350, X = 70, TW = 940;
+    const cv = document.createElement('canvas'); cv.width = Wd; cv.height = H;
+    const g = cv.getContext('2d'), FF = '"PingFang SC","Microsoft YaHei",sans-serif';
+    g.fillStyle = '#f1efe9'; g.fillRect(0, 0, Wd, H);
+    g.fillStyle = '#ffffff'; g.fillRect(36, 36, Wd - 72, H - 72);
+    g.fillStyle = '#5e584f'; g.font = '24px ' + FF;
+    g.fillText(fitText(g, '血多了一滴 · ' + P.aName + ' 对 ' + P.bName + ' · ' + (P.mode === 'flat' ? '固定减伤' : '百分比减伤'), TW), X, 96);
+    g.fillStyle = r.d.w === 'a' ? '#2f5f9a' : r.d.w === 'b' ? '#a8452f' : '#24211c'; g.font = 'bold 32px ' + FF;
+    let y = 150;
+    wrap(g, r.summary, TW).slice(0, 4).forEach((l) => { g.fillText(l, X, y); y += 44; });
+    y += 16;
+    /* 时间轴 */
+    g.fillStyle = '#3a352d'; g.font = '22px ' + FF; g.fillText('对砍时间轴（每一竖线是一刀）', X, y); y += 22;
+    const T = Math.max(r.tl.end, 0.5) * 1.06, lx = X + 150, lw = TW - 150;
+    const xOf = (t) => lx + lw * t / T;
+    for (const s of ['a', 'b']) {
+      g.fillStyle = '#24211c'; g.font = 'bold 20px ' + FF; g.fillText(fitText(g, P[s + 'Name'], 140), X, y + 34);
+      g.fillStyle = '#f6f4ef'; g.fillRect(lx, y + 8, lw, 40);
+      r.tl.ev.filter((x) => x.s === s).forEach((x) => { g.fillStyle = x.kill ? '#1f1b16' : s === 'a' ? '#3d6fae' : '#c0573e'; g.fillRect(xOf(x.t) - (x.kill ? 4 : 1), y + 10, x.kill ? 8 : 3, 36); });
+      y += 54;
+    }
+    g.strokeStyle = '#1f1b16'; g.lineWidth = 2; g.setLineDash([6, 5]); g.beginPath(); g.moveTo(xOf(r.tl.end), y - 108); g.lineTo(xOf(r.tl.end), y); g.stroke(); g.setLineDash([]);
+    g.fillStyle = '#756e63'; g.font = '16px ' + FF; g.fillText('0 秒', lx, y + 18); g.textAlign = 'right'; g.fillText(C.sec(r.tl.end) + ' 第一个倒下', Math.min(X + TW, xOf(r.tl.end) + 100), y + 18); g.textAlign = 'left';
+    y += 56;
+    /* 断点条 */
+    g.fillStyle = '#3a352d'; g.font = '22px ' + FF; g.fillText('刀数断点（对面血量落在哪格就要几刀）', X, y); y += 18;
+    for (const s of ['a', 'b']) {
+      const o = s === 'a' ? 'b' : 'a', st = C.stairs(P, s), span = st.hi - st.lo + 1;
+      g.fillStyle = '#24211c'; g.font = '18px ' + FF; g.fillText(fitText(g, P[s + 'Name'] + '砍' + P[o + 'Name'], TW), X, y + 22); y += 32;
+      st.pts.forEach((p, i) => {
+        const a = p[0], b = i + 1 < st.pts.length ? st.pts[i + 1][0] - 1 : st.hi;
+        const x0 = X + TW * (a - st.lo) / span, w = TW * (b - a + 1) / span;
+        g.fillStyle = SHADE[Math.min(3, Math.max(0, p[1] - st.K + 1))]; g.fillRect(x0, y, w - 2, 40);
+        if (w > 50) { g.fillStyle = '#24211c'; g.font = (st.hp >= a && st.hp <= b ? 'bold ' : '') + '17px ' + FF; g.textAlign = 'center'; g.fillText(p[1] + ' 刀', x0 + w / 2, y + 27); g.textAlign = 'left'; }
+      });
+      const px = X + TW * (st.hp - st.lo + 0.5) / span; g.fillStyle = '#1f1b16'; g.fillRect(px - 2, y - 6, 4, 13); g.fillRect(px - 2, y + 33, 4, 13);
+      y += 52;
+    }
+    y += 22;
+    g.font = '19px ' + FF;
+    const lines = [];
+    r.facts.forEach((f) => wrap(g, '· ' + f, TW).forEach((l) => lines.push(['#3a352d', l])));
+    for (const [c, l] of lines) { if (y > H - 130) break; g.fillStyle = c; g.fillText(l, X, y); y += 28; }
+    /* 最后几刀（填下半截，看清「差一刀」落在哪） */
+    const tail = r.tl.ev.slice(-Math.max(0, Math.min(8, Math.floor((H - 150 - y - 60) / 30))));
+    if (tail.length >= 3) {
+      y += 18; g.fillStyle = '#3a352d'; g.font = '22px ' + FF; g.fillText('最后 ' + tail.length + ' 刀', X, y); y += 10;
+      const cols = [[X + 130, 'right', '时刻'], [X + 170, 'left', '谁出手'], [X + 640, 'right', '第几刀'], [X + TW, 'right', '对方剩血']];
+      g.font = '16px ' + FF; g.fillStyle = '#756e63'; y += 24; cols.forEach(([cx, al, t]) => { g.textAlign = al; g.fillText(t, cx, y); }); g.textAlign = 'left'; y += 6;
+      tail.forEach((e) => {
+        if (e.kill) { g.fillStyle = '#fff3d6'; g.fillRect(X - 8, y + 4, TW + 16, 28); }
+        y += 25; g.fillStyle = e.s === 'a' ? '#2f5f9a' : '#a8452f'; g.font = (e.kill ? 'bold ' : '') + '18px ' + FF;
+        const v = [C.sec(e.t), fitText(g, P[e.s + 'Name'], 420), String(e.i), C.f1(e.left) + (e.kill ? '（倒下）' : '')];
+        cols.forEach(([cx, al], i) => { g.textAlign = al; g.fillText(v[i], cx, y); }); g.textAlign = 'left'; y += 5;
+      });
+    }
+    g.fillStyle = '#756e63'; g.font = '16px ' + FF;
+    wrap(g, '按平均伤害算刀数；不算回血、暴击、闪避、技能、走位。默认单位和数值是虚构的，护甲公式只是常见写法的示意。', TW).forEach((l, i) => g.fillText(l, X, H - 92 + i * 24));
+    return Promise.resolve(cv);
+  }
+  function backup() {
+    const r = last.r;
+    return { app: '血多了一滴', version: 1, savedAt: stamp(), input: copy(state),
+      result: { summary: r.summary, winner: r.d.w, a: { hits: r.d.A.K, time: r.d.A.t, avg: +r.d.A.e.toFixed(6) }, b: { hits: r.d.B.K, time: r.d.B.t, avg: +r.d.B.e.toFixed(6) }, winnerHpLeft: r.d.left ? +r.d.left.hp.toFixed(6) : null } };
+  }
+  function init() {
+    KEYS.forEach((k) => $(k).addEventListener(k === 'mode' ? 'change' : 'input', () => { state[k] = $(k).value; run(); }));
+    PRESETS.forEach((p) => {
+      const b = document.createElement('button'); b.className = 'ghost'; b.textContent = p[0];
+      b.addEventListener('click', () => { state = copy(p[1]); fill(); run(); });
+      $('presets').appendChild(b);
+    });
+    $('reset').addEventListener('click', () => { state = copy(DEFAULT); fill(); run(); });
+    $('dlCSV').addEventListener('click', () => { if (last) download('血多了一滴.csv', new Blob(['\ufeff' + C.toCSV(last.r, stamp())], { type: 'text/csv;charset=utf-8' })); });
+    $('dlMD').addEventListener('click', () => { if (last) download('血多了一滴.md', new Blob([C.toMD(last.r, stamp(), last.sg)], { type: 'text/markdown;charset=utf-8' })); });
+    $('dlJSON').addEventListener('click', () => { if (last) download('血多了一滴-备份.json', new Blob([JSON.stringify(backup(), null, 2)], { type: 'application/json' })); });
+    $('dlPNG').addEventListener('click', () => { if (last) drawPNG(last).then((cv) => cv.toBlob((b) => download('血多了一滴-1080x1350.png', b), 'image/png')); });
+    state = load() || copy(DEFAULT);
+    fill(); run();
+    window.__ex = { last: () => last, state: () => state, presets: PRESETS, DEFAULT, drawPNG };
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+
+  </script>
+</body>
+</html>
